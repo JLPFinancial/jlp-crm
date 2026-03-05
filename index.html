@@ -252,35 +252,6 @@ tbody td{padding:13px 16px;font-size:13px;color:var(--g700);vertical-align:middl
 .modal-submit:hover{background:#1e3a5f}
 .modal-submit:disabled{opacity:.5;cursor:not-allowed}
 
-/* ── LENDER MATCH MODAL ── */
-.lm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
-.lm-overlay.open{opacity:1;pointer-events:all}
-.lm-modal{background:white;border-radius:16px;width:100%;max-width:560px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);transform:translateY(16px);transition:transform .2s}
-.lm-overlay.open .lm-modal{transform:none}
-.lm-head{background:var(--navy);padding:18px 24px;border-radius:16px 16px 0 0;display:flex;align-items:center;gap:12px}
-.lm-head-title{color:white;font-weight:800;font-size:15px;flex:1}
-.lm-head-close{background:none;border:none;color:rgba(255,255,255,.6);font-size:20px;cursor:pointer;line-height:1}
-.lm-body{overflow-y:auto;padding:20px 24px;flex:1}
-.lm-lender{border:1.5px solid var(--g200);border-radius:12px;margin-bottom:14px;overflow:hidden}
-.lm-lender-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--g50)}
-.lm-lender-name{font-weight:800;font-size:15px;color:var(--navy)}
-.lm-verdict{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700}
-.lm-verdict.pass{background:#dcfce7;color:#16a34a}
-.lm-verdict.fail{background:#fee2e2;color:#dc2626}
-.lm-verdict.maybe{background:#fef9c3;color:#b45309}
-.lm-lender-body{padding:14px 18px}
-.lm-rate{font-size:22px;font-weight:800;color:var(--navy);margin-bottom:4px}
-.lm-rate span{font-size:13px;font-weight:500;color:var(--g400)}
-.lm-checks{display:flex;flex-direction:column;gap:6px;margin-top:10px}
-.lm-check{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--g700)}
-.lm-check .icon{font-size:13px;flex-shrink:0;margin-top:1px}
-.lm-check.ok .icon::before{content:'✅'}
-.lm-check.fail .icon::before{content:'❌'}
-.lm-check.warn .icon::before{content:'⚠️'}
-.lm-loading{text-align:center;padding:40px;color:var(--g400);font-size:14px}
-.lm-spinner{width:32px;height:32px;border:3px solid var(--g200);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
-@keyframes spin{to{transform:rotate(360deg)}}
-.lm-extra{font-size:12px;color:var(--g400);margin-top:6px}
 </style>
 </head>
 <body>
@@ -984,7 +955,10 @@ function buildCRMDocSlots(a) {
         return d.name && d.name.toLowerCase().replace(/[^a-z0-9]/gi,'_').includes(key.split('_')[0]);
       });
       const sid = 'crmDoc_' + item.replace(/[^a-z0-9]/gi,'_');
-      const existingDoc = uploaded.find(d => d.name && item && d.name.replace(/[^a-z]/gi,'').toLowerCase().startsWith(item.replace(/[^a-z]/gi,'').toLowerCase().substring(0,6)));
+      const existingDoc = uploaded.find(d => 
+        (d.slot && d.slot === item) ||
+        (d.name && item && d.name.replace(/[^a-z]/gi,'').toLowerCase().startsWith(item.replace(/[^a-z]/gi,'').toLowerCase().substring(0,6)))
+      );
       const isUploaded = !!existingDoc;
       const url = isUploaded ? getDocUrl(existingDoc.path) : null;
       return `<div class="doc-row" style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--g100)">
@@ -1065,10 +1039,6 @@ function openDetail(id) {
       <span style="color:rgba(255,255,255,.3)">/</span>
       <span style="color:white;font-size:14px;font-weight:600">${name}</span>
       <div style="margin-left:auto;display:flex;gap:8px">
-        <button class="hbtn" id="detLenderMatch" style="background:#e8b84b;color:#0f2140;border-color:#e8b84b;font-weight:700" onclick="openLenderMatch()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v6M8 11h6"/></svg>
-          Lender Match
-        </button>
         <button class="hbtn" id="detPrint"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print</button>
       </div>
     </div>
@@ -1906,12 +1876,6 @@ document.addEventListener('keydown', e => {
 });
 </script>
 
-<!-- LENDER MATCH MODAL -->
-<div class="lm-overlay" id="lmOverlay" onclick="if(event.target===this)closeLenderMatch()">
-  <div class="lm-modal">
-    <div class="lm-head">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8b84b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-      <div class="lm-head-title">Lender Match</div>
       <button class="lm-head-close" onclick="closeLenderMatch()">×</button>
     </div>
     <div class="lm-body" id="lmBody">
@@ -1919,146 +1883,6 @@ document.addEventListener('keydown', e => {
     </div>
   </div>
 </div>
-<script>
-// ── LENDER MATCH ──
-const PLENTI_POLICY = `
-LENDER: Plenti Premium Loans
-Effective: 12 February 2026
 
-ELIGIBILITY:
-- Residency: AU/NZ citizen, permanent resident, or approved visa holder
-- Age: 21+ years old
-- Min annual income: $35,000 gross
-- Credit score minimum: 525 (car), 600 (caravan/motorcycle/EV)
-- Employment: Full time 3+ months, Part time 3+ months, Fixed contract 6+ months, Self-employed 12+ months, Casual 6+ months (or 18 months continuity)
-- No bankruptcy, court judgments or unpaid defaults
-- No current arrears on active credit contracts
-- Borrower types: Single applicants only
-- Loan amounts: $5,000–$150,000 (car), $5,000–$110,000 (caravan), $5,000–$50,000 (motorcycle)
-- Loan terms: 2–7 years
-
-RATES (Standard, Asset Backed):
-- New/Demo: 8.99% p.a.
-- 2023–2026 build: 9.29% p.a.
-- 2019–2022 build: 9.49% p.a.
-- 2014–2018 build: 10.79% p.a.
-- 2009–2013 build: 12.79% p.a.
-
-RATES (Non Asset Backed):
-- Tier 1 (Equifax 750+): 9.99%–13.49% depending on age
-- Tier 2 (Equifax 600+): 10.89%–14.59% depending on age
-- Tier 3 (Equifax 525+): 12.99%–17.99% depending on age
-
-Green vehicle (BEV): 0.50% discount on standard rates
-Loan term >5 years: +0.50% loading
-Asset age >15 years at end of term: +2.00% loading
-
-Commission: up to 5% of NAF (100% scale at 5yr, 80% at 4yr, 60% at 3yr, 40% at 2yr)
-Monthly fee: $9.90 | Credit assistance fee: $599
-`;
-
-function openLenderMatch() {
-  document.getElementById('lmOverlay').classList.add('open');
-  document.getElementById('lmBody').innerHTML = '<div class="lm-loading"><div class="lm-spinner"></div>Analysing application against lender policies…</div>';
-  runLenderMatch();
-}
-
-function closeLenderMatch() {
-  document.getElementById('lmOverlay').classList.remove('open');
-}
-
-async function runLenderMatch() {
-  const a = apps.find(x => x.id === curDetailId);
-  if (!a) return;
-
-  const appSummary = `
-APPLICATION DETAILS:
-- Name: ${[a.a1?.firstName, a.a1?.lastName].filter(Boolean).join(' ') || 'Unknown'}
-- Purpose: ${a.purpose || '—'}
-- Finance Type: ${a.finType || '—'}
-- Loan Amount: ${a.loanAmount || '—'}
-- Loan Duration: ${a.loanDuration || '—'} years
-- Balloon: ${a.balloon || '0%'}
-- Asset Make/Model: ${[a.make, a.model].filter(Boolean).join(' ') || '—'}
-- Asset Year: ${a.year || '—'}
-- Asset Condition: ${a.condition || '—'}
-- Purchased From: ${a.purchaseFrom || '—'}
-- Residency: ${a.a1?.residency || '—'}
-- Employment Status: ${a.a1?.empStatus || '—'}
-- Employer: ${a.a1?.empName || '—'}
-- Years at Employer: ${a.a1?.empYrs || '—'}
-- Income: ${a.a1?.income || '—'} (${a.a1?.incomeFreq || '—'}, ${a.a1?.incomeTax || '—'})
-- Living Situation: ${a.a1?.living || '—'}
-- Marital Status: ${a.a1?.marital || '—'}
-- Dependents: ${a.a1?.dependents || '—'}
-- DOB: ${a.a1?.dob || '—'}
-- Visa: ${a.a1?.visa || '—'}
-  `;
-
-  const prompt = `You are an expert Australian finance broker. Assess whether this applicant fits Plenti's lending policy and provide a clear recommendation.
-
-${PLENTI_POLICY}
-
-${appSummary}
-
-Provide your assessment in this exact JSON format (no markdown, just JSON):
-{
-  "lenders": [
-    {
-      "name": "Plenti Premium",
-      "verdict": "pass" | "fail" | "maybe",
-      "rate": "9.29% p.a." (or null if fail),
-      "commission": "e.g. up to 4.5% of NAF",
-      "checks": [
-        {"status": "ok" | "fail" | "warn", "text": "description of check and result"},
-        ...
-      ],
-      "summary": "1-2 sentence plain English summary of fit and recommended next steps"
-    }
-  ]
-}
-
-Be specific — reference the actual policy numbers. If info is missing, note it as a warning. Include 6-8 checks covering: eligibility, income, employment, asset age/type, loan amount, rate tier, any loadings.`;
-
-  try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const data = await resp.json();
-    const raw = data.content?.[0]?.text || '';
-    const clean = raw.replace(/```json|```/g, '').trim();
-    const result = JSON.parse(clean);
-    renderLenderMatch(result);
-  } catch(e) {
-    document.getElementById('lmBody').innerHTML = `<div style="color:var(--red);padding:20px;font-size:13px">⚠️ Could not complete analysis: ${e.message}<br><br>This feature requires the Cloudflare Worker proxy to be set up. Contact support.</div>`;
-  }
-}
-
-function renderLenderMatch(result) {
-  const html = result.lenders.map(l => {
-    const verdictLabel = l.verdict === 'pass' ? '✓ Fits Policy' : l.verdict === 'maybe' ? '⚠ Conditional' : '✗ Does Not Fit';
-    const checks = (l.checks || []).map(c => `<div class="lm-check ${c.status}"><span class="icon"></span>${c.text}</div>`).join('');
-    return `<div class="lm-lender">
-      <div class="lm-lender-head">
-        <div class="lm-lender-name">${l.name}</div>
-        <span class="lm-verdict ${l.verdict}">${verdictLabel}</span>
-      </div>
-      <div class="lm-lender-body">
-        ${l.rate ? `<div class="lm-rate">${l.rate} <span>indicative rate</span></div>` : ''}
-        ${l.commission ? `<div class="lm-extra">Commission: ${l.commission}</div>` : ''}
-        <div class="lm-checks">${checks}</div>
-        ${l.summary ? `<div style="margin-top:12px;padding:10px 14px;background:var(--g50);border-radius:8px;font-size:13px;color:var(--g700);line-height:1.5">${l.summary}</div>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-  document.getElementById('lmBody').innerHTML = html;
-}
-</script>
 </body>
 </html>
