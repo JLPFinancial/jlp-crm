@@ -955,10 +955,19 @@ function buildCRMDocSlots(a) {
         return d.name && d.name.toLowerCase().replace(/[^a-z0-9]/gi,'_').includes(key.split('_')[0]);
       });
       const sid = 'crmDoc_' + item.replace(/[^a-z0-9]/gi,'_');
-      const existingDoc = uploaded.find(d => 
-        (d.slot && d.slot === item) ||
-        (d.name && item && d.name.replace(/[^a-z]/gi,'').toLowerCase().startsWith(item.replace(/[^a-z]/gi,'').toLowerCase().substring(0,6)))
-      );
+      const existingDoc = uploaded.find(d => {
+        if (!d) return false;
+        // Match by slot name (exact)
+        if (d.slot && d.slot === item) return true;
+        // Match by filename starting with slot name
+        if (d.name) {
+          const dClean = d.name.replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9]/g,'');
+          const iClean = item.toLowerCase().replace(/[^a-z0-9]/g,'');
+          if (dClean === iClean) return true;
+          if (dClean.startsWith(iClean.substring(0, 10))) return true;
+        }
+        return false;
+      });
       const isUploaded = !!existingDoc;
       const url = isUploaded ? getDocUrl(existingDoc.path) : null;
       return `<div class="doc-row" style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--g100)">
