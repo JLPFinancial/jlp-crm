@@ -252,6 +252,17 @@ tbody td{padding:13px 16px;font-size:13px;color:var(--g700);vertical-align:middl
 .modal-submit:hover{background:#1e3a5f}
 .modal-submit:disabled{opacity:.5;cursor:not-allowed}
 
+
+/* ── DOC UPLOAD MODAL ── */
+.doc-desc-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:600;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.doc-desc-overlay.open{opacity:1;pointer-events:all}
+.doc-desc-box{background:white;border-radius:14px;padding:28px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.doc-desc-title{font-size:16px;font-weight:800;color:var(--navy);margin-bottom:4px}
+.doc-desc-sub{font-size:13px;color:var(--g500);margin-bottom:16px}
+.doc-desc-input{width:100%;padding:10px 14px;border:1.5px solid var(--g200);border-radius:8px;font-size:14px;font-family:'DM Sans',sans-serif;box-sizing:border-box;margin-bottom:16px;outline:none}
+.doc-desc-input:focus{border-color:var(--navy)}
+.doc-upload-area{border:2px dashed var(--g200);border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:all .2s;color:var(--g500)}
+.doc-upload-area:hover,.doc-upload-area.drag-over{border-color:var(--navy);background:rgba(15,33,64,.03);color:var(--navy)}
 </style>
 </head>
 <body>
@@ -885,33 +896,53 @@ function buildDocListHTML(a) {
   }).join('');
 }
 
-async function handleDocFiles(files) {
+// ── DOC UPLOAD WITH DESCRIPTION ──
+let _pendingDocFiles = [];
+function handleDocFiles(files) {
   if (!files || !files.length) return;
+  _pendingDocFiles = Array.from(files);
+  document.getElementById('crmDocDescInput').value = '';
+  document.getElementById('crmDocDescInput').style.borderColor = '';
+  document.getElementById('crmDocDescOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('crmDocDescInput').focus(), 100);
+}
+function closeCrmDocDesc() {
+  document.getElementById('crmDocDescOverlay').classList.remove('open');
+  _pendingDocFiles = [];
+}
+async function confirmCrmDocUpload() {
+  const desc = document.getElementById('crmDocDescInput').value.trim();
+  if (!desc) { document.getElementById('crmDocDescInput').style.borderColor = 'var(--red)'; return; }
+  closeCrmDocDesc();
   const a = apps.find(x => x.id === curDetailId);
   if (!a) return;
+  const applicantName = [a.a1?.firstName, a.a1?.lastName].filter(Boolean).join(' ');
+  const nameSuffix = applicantName ? ' - ' + applicantName : '';
   const statusEl = document.getElementById('docUploadStatus');
-  statusEl.innerHTML = '<div style="color:var(--amber);font-size:12px;margin-top:6px">Uploading ' + files.length + ' file(s)…</div>';
+  statusEl.innerHTML = '<div style="color:var(--amber);font-size:12px;margin-top:6px">Uploading…</div>';
   const newDocs = Array.isArray(a.documents) ? [...a.documents] : [];
   let uploaded = 0;
-  for (const file of Array.from(files)) {
+  for (const file of _pendingDocFiles) {
     try {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const path = curDetailId + '/' + Date.now() + '_' + safeName;
+      const ext = file.name.includes('.') ? file.name.split('.').pop() : 'pdf';
+      const safeName = (desc + nameSuffix).replace(/[^a-zA-Z0-9.]/g, '_') + '.' + ext;
+      const path = curDetailId + '/' + safeName;
       const res = await fetch('https://gxwwcrcllhaaoewgcbeo.supabase.co/storage/v1/object/documents/' + path, {
         method: 'POST',
         headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd4d3djcmNsbGhhYW9ld2djYmVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MjE4MTIsImV4cCI6MjA4ODA5NzgxMn0.twL-AmGGqfH29Nsl2p-Ezqi5zJ_h-3TOrguFAdjiET8', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd4d3djcmNsbGhhYW9ld2djYmVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MjE4MTIsImV4cCI6MjA4ODA5NzgxMn0.twL-AmGGqfH29Nsl2p-Ezqi5zJ_h-3TOrguFAdjiET8', 'Content-Type': file.type||'application/octet-stream', 'x-upsert': 'true' },
         body: file
       });
-      if (res.ok) { newDocs.push({ name: file.name, path: path }); uploaded++; }
-      else { console.warn('Upload failed', file.name, await res.text()); }
+      if (res.ok) { newDocs.push({ name: desc, slot: desc, path }); uploaded++; }
+      else console.warn('Upload failed', await res.text());
     } catch(e) { console.warn('Upload error', e); }
   }
+  _pendingDocFiles = [];
   a.documents = newDocs;
   await dbPatch(curDetailId, { documents: newDocs });
   document.getElementById('docFileList').innerHTML = buildDocListHTML(a);
   statusEl.innerHTML = uploaded > 0
-    ? '<div style="color:var(--green);font-size:12px;margin-top:6px">✓ ' + uploaded + ' file(s) uploaded</div>'
-    : '<div style="color:var(--red);font-size:12px;margin-top:6px">Upload failed — check console</div>';
+    ? '<div style="color:var(--green);font-size:12px;margin-top:6px">✓ Uploaded</div>'
+    : '<div style="color:var(--red);font-size:12px;margin-top:6px">Upload failed</div>';
   setTimeout(() => { if(statusEl) statusEl.innerHTML=''; }, 3000);
 }
 
@@ -1146,7 +1177,7 @@ function openDetail(id) {
               ${df('State',a.a1?.state,'a1.state')}
               ${df('Postcode',a.a1?.postcode,'a1.postcode')}
             </div>
-            ${(parseInt(a.a1?.addrYrs)||0)<3?`
+            ${(a.a1?.addrYrs && parseInt(a.a1.addrYrs)<3)?`
             <div class="app-sub">Previous Address</div>
             <div class="app-span">${df('Street',a.a1?.prevStreet,'a1.prevStreet')}</div>
             <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 0.5fr 0.5fr;gap:14px 24px">
@@ -1170,7 +1201,7 @@ function openDetail(id) {
               ${dfs('Frequency',a.a1?.incomeFreq,'a1.incomeFreq',['Weekly','Fortnightly','Monthly','Annually'])}
               ${dfs('Tax Treatment',a.a1?.incomeTax,'a1.incomeTax',['Before Tax','After Tax'])}
             </div>
-            ${(parseInt(a.a1?.empYrs)||0)<3?`
+            ${(a.a1?.empYrs && parseInt(a.a1.empYrs)<3)?`
             <div class="app-sub">Previous Employment</div>
             <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 0.5fr 0.5fr;gap:14px 24px">
               ${dfs('Previous Status',a.a1?.prevEmpStatus,'a1.prevEmpStatus',['Full Time','Part Time','Casual','Self-Employed','Other'])}
@@ -1274,7 +1305,7 @@ function openDetail(id) {
               ${df('State',a.a2?.state,'a2.state')}
               ${df('Postcode',a.a2?.postcode,'a2.postcode')}
             </div>
-            ${(parseInt(a.a2?.addrYrs)||0)<3?`
+            ${(a.a2?.addrYrs && parseInt(a.a2.addrYrs)<3)?`
             <div class="app-sub">Previous Address</div>
             <div class="app-span">${df('Street',a.a2?.prevStreet,'a2.prevStreet')}</div>
             <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 0.5fr 0.5fr;gap:14px 24px">
@@ -1297,7 +1328,7 @@ function openDetail(id) {
               ${dfs('Frequency',a.a2?.incomeFreq,'a2.incomeFreq',['Weekly','Fortnightly','Monthly','Annually'])}
               ${dfs('Tax Treatment',a.a2?.incomeTax,'a2.incomeTax',['Before Tax','After Tax'])}
             </div>
-            ${(parseInt(a.a2?.empYrs)||0)<3?`
+            ${(a.a2?.empYrs && parseInt(a.a2.empYrs)<3)?`
             <div class="app-sub">Previous Employment</div>
             <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 0.5fr 0.5fr;gap:14px 24px">
               ${dfs('Previous Status',a.a2?.prevEmpStatus,'a2.prevEmpStatus',['Full Time','Part Time','Casual','Self-Employed','Other'])}
@@ -1375,6 +1406,17 @@ function openDetail(id) {
 
   // Bind detail events
   document.getElementById('detBack').addEventListener('click', ()=>showList());
+
+  // Doc upload area — click and drag
+  const uploadArea = document.getElementById('docUploadArea');
+  const uploadInput = document.getElementById('docUploadInput');
+  if (uploadArea && uploadInput) {
+    uploadArea.onclick = () => uploadInput.click();
+    uploadInput.onchange = () => handleDocFiles(uploadInput.files);
+    uploadArea.ondragover = (e) => { e.preventDefault(); uploadArea.classList.add('drag-over'); };
+    uploadArea.ondragleave = () => uploadArea.classList.remove('drag-over');
+    uploadArea.ondrop = (e) => { e.preventDefault(); uploadArea.classList.remove('drag-over'); handleDocFiles(e.dataTransfer.files); };
+  }
   initInlineEdit();
 
   // Passport toggle - hide if licence entered
@@ -1893,5 +1935,18 @@ document.addEventListener('keydown', e => {
   </div>
 </div>
 
+
+<div class="doc-desc-overlay" id="crmDocDescOverlay" onclick="if(event.target===this)closeCrmDocDesc()">
+  <div class="doc-desc-box">
+    <div class="doc-desc-title">Describe this document</div>
+    <div class="doc-desc-sub">What type of document is this? e.g. Bank Statement, Tax Return</div>
+    <input class="doc-desc-input" id="crmDocDescInput" type="text" placeholder="e.g. Bank Statement"
+      onkeydown="if(event.key==='Enter')confirmCrmDocUpload();if(event.key==='Escape')closeCrmDocDesc()">
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="closeCrmDocDesc()" style="padding:9px 18px;border:1.5px solid var(--g200);background:white;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;color:var(--g600)">Cancel</button>
+      <button onclick="confirmCrmDocUpload()" style="padding:9px 18px;background:var(--navy);color:white;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">Upload</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
