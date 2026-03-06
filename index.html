@@ -321,22 +321,48 @@ let apps = [], filtered = [], curPage = 1, PER = 15, curView = 'applications', c
 
 // ── SUPABASE ──
 async function dbLoad() {
-  const res = await fetch(SURL+'/rest/v1/applications?select=*&order=submitted_at.desc', {headers:SH});
-  const rows = await res.json();
-  if (!Array.isArray(rows)) { console.error('Load error', rows); return; }
-  apps = rows.map(r => ({
-    id: r.app_id, _rid: r.id,
-    submittedAt: r.submitted_at, status: r.status||'New', notes: r.notes||'',
-    purpose: r.purpose, finType: r.fin_type, applicantType: r.applicant_type,
-    loanAmount: r.loan_amount, loanDuration: r.loan_duration, balloon: r.balloon,
-    make: r.make, model: r.model, year: r.year, rego: r.rego, vin: r.vin,
-    condition: r.condition, purchaseFrom: r.purchase_from,
-    a1: r.a1||{}, a2: r.a2||null, biz: r.biz||null,
-    assets: Array.isArray(r.assets)?r.assets:[],
-    liabilities: Array.isArray(r.liabilities)?r.liabilities:[],
-    expenses: Array.isArray(r.expenses)?r.expenses:[],
-    documents: Array.isArray(r.documents)?r.documents:[],
-  }));
+  try {
+    const res = await fetch(SURL+'/rest/v1/applications?select=*&order=submitted_at.desc', {headers:SH});
+    
+    if (!res.ok) {
+      console.error('Database fetch error:', res.status, res.statusText);
+      showToast('❌ Unable to load applications. Check your connection.');
+      return;
+    }
+    
+    const rows = await res.json();
+    
+    // Better error checking for response type
+    if (!Array.isArray(rows)) {
+      console.error('Invalid response - expected array, got:', typeof rows, rows);
+      showToast('❌ Data format error. Check database.');
+      return;
+    }
+    
+    apps = rows.map(r => {
+      // Safety check: ensure submitted_at has a value (use created_at or now as fallback)
+      const submittedDate = r.submitted_at || r.created_at || new Date().toISOString();
+      
+      return {
+        id: r.app_id, _rid: r.id,
+        submittedAt: submittedDate, status: r.status||'New', notes: r.notes||'',
+        purpose: r.purpose, finType: r.fin_type, applicantType: r.applicant_type,
+        loanAmount: r.loan_amount, loanDuration: r.loan_duration, balloon: r.balloon,
+        make: r.make, model: r.model, year: r.year, rego: r.rego, vin: r.vin,
+        condition: r.condition, purchaseFrom: r.purchase_from,
+        a1: r.a1||{}, a2: r.a2||null, biz: r.biz||null,
+        assets: Array.isArray(r.assets)?r.assets:[],
+        liabilities: Array.isArray(r.liabilities)?r.liabilities:[],
+        expenses: Array.isArray(r.expenses)?r.expenses:[],
+        documents: Array.isArray(r.documents)?r.documents:[],
+      };
+    });
+    
+    console.log('✓ Loaded', apps.length, 'applications');
+  } catch(e) {
+    console.error('Database load failed:', e);
+    showToast('❌ Failed to load applications: ' + e.message);
+  }
 }
 
 async function dbPatch(id, data) {
