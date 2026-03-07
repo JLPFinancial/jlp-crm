@@ -1684,8 +1684,10 @@ async function loadSampleData() {
 // ── NAV HELPERS ──
 function filterNav(s) {
   showList().then(()=>{
-    const sf=document.getElementById('sf');
-    if(sf){sf.value=s;applyFilters();}
+    document.querySelectorAll('#sfDropdown input[type=checkbox]').forEach(cb=>{
+      cb.checked = s ? cb.value===s : false;
+    });
+    sfChanged();
   });
 }
 
