@@ -344,7 +344,7 @@ async function dbLoad() {
       const submittedDate = r.submitted_at || r.created_at || new Date().toISOString();
       
       return {
-        id: r.app_id, _rid: r.id,
+        id: r.app_id || r.id, _rid: r.id,
         submittedAt: submittedDate, status: r.status||'New', notes: r.notes||'',
         purpose: r.purpose, finType: r.fin_type, applicantType: r.applicant_type,
         loanAmount: r.loan_amount, loanDuration: r.loan_duration, balloon: r.balloon,
@@ -366,13 +366,17 @@ async function dbLoad() {
 }
 
 async function dbPatch(id, data) {
-  await fetch(SURL+'/rest/v1/applications?app_id=eq.'+encodeURIComponent(id), {
+  const app = apps.find(x => x.id === id);
+  const rid = app ? app._rid : id;
+  await fetch(SURL+'/rest/v1/applications?id=eq.'+encodeURIComponent(rid), {
     method:'PATCH', headers:{...SH,'Prefer':'return=minimal'}, body:JSON.stringify(data)
   });
 }
 
 async function dbDelete(id) {
-  await fetch(SURL+'/rest/v1/applications?app_id=eq.'+encodeURIComponent(id), {
+  const app = apps.find(x => x.id === id);
+  const rid = app ? app._rid : id;
+  await fetch(SURL+'/rest/v1/applications?id=eq.'+encodeURIComponent(rid), {
     method:'DELETE', headers:SH
   });
 }
